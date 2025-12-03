@@ -1,0 +1,160 @@
+# Claude Code Message Watcher
+# Monitors the sync file and launches Claude Code when new messages arrive
+
+param(
+    [string]$ComputerName = $null
+)
+
+# Load configuration
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "config.ps1")
+
+if (-not $ComputerName) {
+    $ComputerName = $Global:ComputerName
+}
+
+$SyncFilePath = $Global:MessagesFile
+$LogPath = $Global:WatcherLogPath
+
+function Write-Log {
+    param([string]$Message)
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp - $Message" | Add-Content -Path $LogPath
+    Write-Host "$timestamp - $Message"
+}
+
+function Get-SyncData {
+    $maxRetries = 5
+    $retryDelay = 100  # milliseconds
+
+    for ($i = 0; $i -lt $maxRetries; $i++) {
+        try {
+            if (-not (Test-Path $SyncFilePath)) {
+                return @{ messages = @() }
+            }
+            $content = Get-Content -Path $SyncFilePath -Raw -ErrorAction Stop
+            if ([string]::IsNullOrWhiteSpace($content)) {
+                return @{ messages = @() }
+            }
+            return ($content | ConvertFrom-Json)
+        }
+        catch {
+            if ($i -eq ($maxRetries - 1)) {
+                Write-Log "ERROR: Failed to read sync file after $maxRetries attempts: $_"
+                return $null
+            }
+            Start-Sleep -Milliseconds $retryDelay
+        }
+    }
+}
+
+function Set-SyncData {
+    param($Data)
+
+    $maxRetries = 5
+    $retryDelay = 100
+
+    for ($i = 0; $i -lt $maxRetries; $i++) {
+        try {
+            $json = ($Data | ConvertTo-Json -Depth 10)
+            $json | Set-Content -Path $SyncFilePath -ErrorAction Stop
+            return $true
+        }
+        catch {
+            if ($i -eq ($maxRetries - 1)) {
+                Write-Log "ERROR: Failed to write sync file after $maxRetries attempts: $_"
+                return $false
+            }
+            Start-Sleep -Milliseconds $retryDelay
+        }
+    }
+}
+
+function Process-Messages {
+    $data = Get-SyncData
+    if (-not $data) { return }
+
+    # Handle both exact match and case-insensitive match for computer name
+    $unreadMessages = $data.messages | Where-Object {
+        (($_.recipient -eq $ComputerName) -or ($_.recipient -ieq $ComputerName)) -and (-not $_.processed)
+    }
+
+    if (-not $unreadMessages -or $unreadMessages.Count -eq 0) {
+        return
+    }
+
+    Write-Log "Found $($unreadMessages.Count) unread message(s)"
+
+    foreach ($msg in $unreadMessages) {
+        Write-Log "Processing message from $($msg.sender): $($msg.message)"
+
+        try {
+            # Launch Claude Code with the message
+            $prompt = "MESSAGE FROM OTHER COMPUTER ($($msg.sender)): $($msg.message)"
+            Write-Log "Launching Claude Code with prompt..."
+
+            # Launch Claude in a new window without blocking the watcher
+            $claudePath = "$env:USERPROFILE\.local\bin\claude.exe"
+            Start-Process -FilePath $claudePath -ArgumentList "`"$prompt`""
+
+            Write-Log "Claude Code launched"
+
+            # Mark as processed immediately to avoid duplicate processing
+            $msg.processed = $true
+            $msg | Add-Member -NotePropertyName "processed_at" -NotePropertyValue (Get-Date -Format "o") -Force
+            $msg | Add-Member -NotePropertyName "processed_by" -NotePropertyValue $ComputerName -Force
+
+            if (Set-SyncData -Data $data) {
+                Write-Log "Marked message $($msg.id) as processed"
+            }
+        }
+        catch {
+            Write-Log "ERROR processing message: $_"
+        }
+    }
+}
+
+# Initial setup
+Write-Log "Claude Code Message Watcher started for computer: $ComputerName"
+Write-Log "Watching file: $SyncFilePath"
+Write-Log "Log file: $LogPath"
+
+# Initial check
+Process-Messages
+
+# Set up file watcher
+$watcher = New-Object System.IO.FileSystemWatcher
+$watcher.Path = Split-Path -Parent $SyncFilePath
+$watcher.Filter = Split-Path -Leaf $SyncFilePath
+$watcher.EnableRaisingEvents = $true
+$watcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite
+
+# Track last process time to debounce
+$script:lastProcessTime = [DateTime]::MinValue
+
+# Register event handler
+$action = {
+    $now = [DateTime]::Now
+    if (($now - $script:lastProcessTime).TotalMilliseconds -gt 1000) {
+        $script:lastProcessTime = $now
+        Start-Sleep -Milliseconds 500  # Wait for file to settle
+        Process-Messages
+    }
+}
+
+Register-ObjectEvent -InputObject $watcher -EventName Changed -Action $action | Out-Null
+
+Write-Log "File watcher active"
+
+# Keep the script running
+try {
+    while ($true) {
+        Start-Sleep -Seconds 30
+        # Periodic check in case file watcher misses something
+        Process-Messages
+    }
+}
+finally {
+    $watcher.Dispose()
+    Write-Log "Watcher stopped"
+}
