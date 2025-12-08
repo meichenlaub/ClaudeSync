@@ -1,7 +1,8 @@
 # Send a message to the other computer via Claude Code sync
 param(
-    [Parameter(Mandatory=$true)]
     [string]$Message,
+
+    [string]$MessageFile,
 
     [Parameter(Mandatory=$true)]
     [string]$Recipient,
@@ -11,6 +12,21 @@ param(
     [ValidateSet("task", "response")]
     [string]$Type = "task"
 )
+
+# Validate: require either -Message or -MessageFile
+if (-not $Message -and -not $MessageFile) {
+    Write-Error "Either -Message or -MessageFile must be provided"
+    exit 1
+}
+
+# Read from file if provided
+if ($MessageFile) {
+    if (-not (Test-Path $MessageFile)) {
+        Write-Error "Message file not found: $MessageFile"
+        exit 1
+    }
+    $Message = Get-Content -Path $MessageFile -Raw
+}
 
 # Load configuration
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
