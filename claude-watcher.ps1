@@ -90,14 +90,38 @@ function Process-Messages {
 
         try {
             # Launch Claude Code with the message
-            $prompt = "MESSAGE FROM OTHER COMPUTER ($($msg.sender)): $($msg.message)"
-            Write-Log "Launching Claude Code with prompt..."
+            $sendMessageScript = Join-Path $ScriptDir "send-message.ps1"
+            $prompt = @"
+MESSAGE FROM OTHER COMPUTER ($($msg.sender)):
+$($msg.message)
 
-            # Launch Claude in a new window without blocking the watcher
+---
+IMPORTANT INSTRUCTIONS:
+1. Complete the task described above
+2. After completing (success or failure), you MUST report back by running:
+   pwsh -NoProfile -File "$sendMessageScript" -Message "YOUR_RESPONSE" -Recipient "$($msg.sender)"
+
+   Replace YOUR_RESPONSE with:
+   - "SUCCESS: [brief description of what was done]" if successful
+   - "FAILURE: [reason]" if something went wrong
+
+3. This is an automated task - execute it fully without asking for confirmation
+4. Original message ID: $($msg.id)
+"@
+            Write-Log "Launching Claude Code with prompt (auto-close mode)..."
+
+            # Launch Claude with -p flag (runs prompt and exits) and --dangerously-skip-permissions
             $claudePath = "$env:USERPROFILE\.local\bin\claude.exe"
-            Start-Process -FilePath $claudePath -ArgumentList "`"$prompt`""
+            $process = Start-Process -FilePath $claudePath -ArgumentList "-p", "`"$prompt`"", "--dangerously-skip-permissions" -PassThru -NoNewWindow
 
-            Write-Log "Claude Code launched"
+            # Wait for Claude to complete (with timeout of 10 minutes)
+            $completed = $process.WaitForExit(600000)
+            if (-not $completed) {
+                Write-Log "WARNING: Claude process timed out after 10 minutes, killing..."
+                $process.Kill()
+            }
+
+            Write-Log "Claude Code finished (exit code: $($process.ExitCode))"
 
             # Mark as processed immediately to avoid duplicate processing
             $msg.processed = $true
