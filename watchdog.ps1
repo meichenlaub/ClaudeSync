@@ -13,11 +13,9 @@ function Write-Log {
     "$timestamp - $Message" | Add-Content -Path $LogPath
 }
 
-# Check if watcher is running
-$watcherRunning = Get-Process -Name powershell -ErrorAction SilentlyContinue |
-    Where-Object {
-        try { $_.CommandLine -like "*claude-watcher.ps1*" } catch { $false }
-    }
+# Check if watcher is running (use CimInstance to access CommandLine)
+$watcherRunning = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*claude-watcher.ps1*" }
 
 if ($watcherRunning) {
     # Only log occasionally to avoid huge log files
