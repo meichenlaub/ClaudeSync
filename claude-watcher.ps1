@@ -110,9 +110,22 @@ function Process-Messages {
         Write-Log "Processing task from $($msg.sender): $($msg.message)"
 
         try {
+            # Mark as processed BEFORE launching Claude to prevent race condition
+            # (If Claude restarts the watcher, we don't want to reprocess this message)
+            $msg.processed = $true
+            $msg | Add-Member -NotePropertyName "processed_at" -NotePropertyValue (Get-Date -Format "o") -Force
+            $msg | Add-Member -NotePropertyName "processed_by" -NotePropertyValue $ComputerName -Force
+
+            if (Set-SyncData -Data $data) {
+                Write-Log "Marked message $($msg.id) as processed"
+            } else {
+                Write-Log "WARNING: Failed to mark message as processed, skipping to avoid duplicate processing"
+                continue
+            }
+
             # Launch Claude Code with the message
             $sendMessageScript = Join-Path $ScriptDir "send-message.ps1"
-            
+
             # Friendly, trust-establishing prompt format
             $prompt = @"
 [ClaudeSync Task from Mark's $($msg.sender)]
@@ -150,15 +163,6 @@ Task ID: $($msg.id)
             }
 
             Write-Log "Claude Code finished (exit code: $($process.ExitCode))"
-
-            # Mark as processed immediately to avoid duplicate processing
-            $msg.processed = $true
-            $msg | Add-Member -NotePropertyName "processed_at" -NotePropertyValue (Get-Date -Format "o") -Force
-            $msg | Add-Member -NotePropertyName "processed_by" -NotePropertyValue $ComputerName -Force
-
-            if (Set-SyncData -Data $data) {
-                Write-Log "Marked message $($msg.id) as processed"
-            }
         }
         catch {
             Write-Log "ERROR processing message: $_"
