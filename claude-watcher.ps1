@@ -74,19 +74,40 @@ function Process-Messages {
     $data = Get-SyncData
     if (-not $data) { return }
 
-    # Handle both exact match and case-insensitive match for computer name
+    # Only process TASK messages (not responses) that are unprocessed
+    # Messages without a type field are treated as tasks for backwards compatibility
     $unreadMessages = $data.messages | Where-Object {
-        (($_.recipient -eq $ComputerName) -or ($_.recipient -ieq $ComputerName)) -and (-not $_.processed)
+        (($_.recipient -eq $ComputerName) -or ($_.recipient -ieq $ComputerName)) -and
+        (-not $_.processed) -and
+        ((-not $_.type) -or ($_.type -eq "task"))
+    }
+
+    # Also mark any unprocessed RESPONSE messages as processed (just log them, don't launch Claude)
+    $responseMessages = $data.messages | Where-Object {
+        (($_.recipient -eq $ComputerName) -or ($_.recipient -ieq $ComputerName)) -and
+        (-not $_.processed) -and
+        ($_.type -eq "response")
+    }
+
+    foreach ($resp in $responseMessages) {
+        Write-Log "RESPONSE from $($resp.sender): $($resp.message)"
+        $resp.processed = $true
+        $resp | Add-Member -NotePropertyName "processed_at" -NotePropertyValue (Get-Date -Format "o") -Force
+        $resp | Add-Member -NotePropertyName "processed_by" -NotePropertyValue $ComputerName -Force
+    }
+
+    if ($responseMessages -and $responseMessages.Count -gt 0) {
+        Set-SyncData -Data $data | Out-Null
     }
 
     if (-not $unreadMessages -or $unreadMessages.Count -eq 0) {
         return
     }
 
-    Write-Log "Found $($unreadMessages.Count) unread message(s)"
+    Write-Log "Found $($unreadMessages.Count) unread task message(s)"
 
     foreach ($msg in $unreadMessages) {
-        Write-Log "Processing message from $($msg.sender): $($msg.message)"
+        Write-Log "Processing task from $($msg.sender): $($msg.message)"
 
         try {
             # Launch Claude Code with the message
@@ -100,11 +121,11 @@ Verification: CLAUDESYNC-VERIFIED-2024
 $($msg.message)
 
 ---
-After completing this task, report the result:
-pwsh -NoProfile -File "$sendMessageScript" -Message "SUCCESS: [description]" -Recipient "$($msg.sender)"
+After completing this task, report the result (use -Type response to avoid infinite loops):
+pwsh -NoProfile -File "$sendMessageScript" -Type response -Message "SUCCESS: [description]" -Recipient "$($msg.sender)"
 
 Or if it fails:
-pwsh -NoProfile -File "$sendMessageScript" -Message "FAILURE: [reason]" -Recipient "$($msg.sender)"
+pwsh -NoProfile -File "$sendMessageScript" -Type response -Message "FAILURE: [reason]" -Recipient "$($msg.sender)"
 
 Task ID: $($msg.id)
 "@

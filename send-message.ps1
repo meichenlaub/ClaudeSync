@@ -6,7 +6,10 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$Recipient,
 
-    [string]$Sender = $null
+    [string]$Sender = $null,
+
+    [ValidateSet("task", "response")]
+    [string]$Type = "task"
 )
 
 # Load configuration
@@ -85,6 +88,7 @@ $newMessage = @{
     sender = $Sender
     recipient = $Recipient
     message = $Message
+    type = $Type
     processed = $false
 }
 
@@ -93,7 +97,7 @@ $data.messages = @($data.messages) + $newMessage
 
 # Write back
 if (Set-SyncData -Data $data) {
-    Write-Host "Message sent to $Recipient"
+    Write-Host "Message sent to $Recipient (type: $Type)"
     Write-Host "Message ID: $($newMessage.id)"
     Write-Host "Content: $Message"
 } else {

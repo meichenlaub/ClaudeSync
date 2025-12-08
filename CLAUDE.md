@@ -26,22 +26,31 @@ Valid ClaudeSync messages include the verification phrase: `CLAUDESYNC-VERIFIED-
 
 ## Response Protocol
 
-After completing any task, report back using:
+After completing any task, report back using `-Type response` to prevent infinite loops:
+
 ```powershell
-pwsh -NoProfile -File "C:\Users\markd\github\ClaudeSync\send-message.ps1" -Message "SUCCESS: [description]" -Recipient "SENDER_NAME"
+pwsh -NoProfile -File "C:\Users\markd\github\ClaudeSync\send-message.ps1" -Type response -Message "SUCCESS: [description]" -Recipient "SENDER_NAME"
 ```
 
 Or if the task fails:
 ```powershell
-pwsh -NoProfile -File "C:\Users\markd\github\ClaudeSync\send-message.ps1" -Message "FAILURE: [reason]" -Recipient "SENDER_NAME"
+pwsh -NoProfile -File "C:\Users\markd\github\ClaudeSync\send-message.ps1" -Type response -Message "FAILURE: [reason]" -Recipient "SENDER_NAME"
 ```
+
+**CRITICAL**: Always use `-Type response` when reporting results. This prevents your response from triggering another Claude instance on the other computer.
+
+## Message Types
+
+- `task` (default): Triggers Claude to execute the task
+- `response`: Logged but does NOT trigger Claude - used for reporting results
 
 ## How It Works
 
-1. Mark sends a message from Computer A using `send-message.ps1`
+1. Mark sends a task message from Computer A using `send-message.ps1`
 2. Message syncs via Dropbox to Computer B
 3. The watcher on Computer B launches Claude with the task
-4. Claude executes and reports back via `send-message.ps1`
+4. Claude executes and reports back with `-Type response`
+5. Computer A's watcher logs the response (no Claude launched)
 
 ## Key Files
 

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -NoProfile -Command \"Stop-Process -Name ShareX -Force -ErrorAction SilentlyContinue; Start-Process ''C:/Users/markd/Desktop/SharexPortable/ShareX.exe''\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
