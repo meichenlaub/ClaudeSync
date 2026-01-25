@@ -1,6 +1,9 @@
 # Mark all unprocessed response messages as processed
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "config.ps1")
+
 $myName = (hostname.exe).Trim()
-$data = Get-Content 'C:\Users\markd\Dropbox\ClaudeSync\messages.json' -Raw | ConvertFrom-Json
+$data = Get-Content $Global:MessagesFile -Raw | ConvertFrom-Json
 
 $responses = $data.messages | Where-Object {
     $_.recipient -eq $myName -and
@@ -21,5 +24,5 @@ foreach ($resp in $responses) {
     $resp | Add-Member -NotePropertyName "processed_by" -NotePropertyValue $myName -Force
 }
 
-$data | ConvertTo-Json -Depth 10 | Set-Content 'C:\Users\markd\Dropbox\ClaudeSync\messages.json'
+$data | ConvertTo-Json -Depth 10 | Set-Content $Global:MessagesFile
 Write-Host "Done - marked $($responses.Count) response(s) as processed"

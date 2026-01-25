@@ -1,16 +1,18 @@
 # Find any startup items or scheduled tasks referencing old Dropbox ClaudeSync location
 Write-Host "=== Startup Folder Shortcuts ===" -ForegroundColor Cyan
-$startupPath = 'C:\Users\markd\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup'
+$startupPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
 $sh = New-Object -ComObject WScript.Shell
 
-Get-ChildItem $startupPath -Filter "*.lnk" | ForEach-Object {
+Get-ChildItem $startupPath -Filter "*.lnk" -ErrorAction SilentlyContinue | ForEach-Object {
     $shortcut = $sh.CreateShortcut($_.FullName)
     $target = "$($shortcut.TargetPath) $($shortcut.Arguments)"
     Write-Host "`n$($_.Name):"
     Write-Host "  Target: $($shortcut.TargetPath)"
     Write-Host "  Args: $($shortcut.Arguments)"
     if ($target -like "*Dropbox*ClaudeSync*" -or $target -like "*Dropbox*claudesync*") {
-        Write-Host "  *** POINTS TO DROPBOX! ***" -ForegroundColor Red
+        Write-Host "  *** POINTS TO DROPBOX (should be Google Drive)! ***" -ForegroundColor Red
+    } elseif ($target -like "*ClaudeSync*" -or $target -like "*claude-watcher*") {
+        Write-Host "  OK: ClaudeSync reference (not Dropbox)" -ForegroundColor Green
     }
 }
 
@@ -24,7 +26,7 @@ Get-ScheduledTask | Where-Object { $_.TaskName -like "*Claude*" -or $_.TaskName 
         Write-Host "  WorkingDir: $($action.WorkingDirectory)"
         $fullPath = "$($action.Execute) $($action.Arguments) $($action.WorkingDirectory)"
         if ($fullPath -like "*Dropbox*") {
-            Write-Host "  *** REFERENCES DROPBOX! ***" -ForegroundColor Red
+            Write-Host "  *** REFERENCES DROPBOX (should be Google Drive)! ***" -ForegroundColor Red
         }
     }
 }
@@ -41,7 +43,7 @@ foreach ($key in $runKeys) {
             if ($_.Value -like "*Claude*" -or $_.Value -like "*watcher*") {
                 Write-Host "$key\$($_.Name): $($_.Value)"
                 if ($_.Value -like "*Dropbox*") {
-                    Write-Host "  *** REFERENCES DROPBOX! ***" -ForegroundColor Red
+                    Write-Host "  *** REFERENCES DROPBOX (should be Google Drive)! ***" -ForegroundColor Red
                 }
             }
         }

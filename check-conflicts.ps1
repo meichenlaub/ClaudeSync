@@ -1,6 +1,9 @@
 # Check conflicted copies for unprocessed messages
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "config.ps1")
+
 $myName = (hostname.exe).Trim()
-$conflictFiles = Get-ChildItem 'C:\Users\markd\Dropbox\ClaudeSync' -Filter "*conflicted*"
+$conflictFiles = Get-ChildItem $Global:GoogleDriveSyncDir -Filter "*conflicted*"
 
 foreach ($file in $conflictFiles) {
     Write-Host "=== $($file.Name) ===" -ForegroundColor Yellow
@@ -20,7 +23,7 @@ foreach ($file in $conflictFiles) {
 }
 
 Write-Host "=== Main messages.json ===" -ForegroundColor Green
-$main = Get-Content 'C:\Users\markd\Dropbox\ClaudeSync\messages.json' -Raw | ConvertFrom-Json
+$main = Get-Content $Global:MessagesFile -Raw | ConvertFrom-Json
 $recentMain = $main.messages | Sort-Object timestamp -Descending | Select-Object -First 3
 foreach ($msg in $recentMain) {
     $processed = if ($msg.processed) { "PROCESSED" } else { "UNPROCESSED" }

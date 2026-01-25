@@ -1,6 +1,9 @@
 # Merge conflicted message files
-$mainFile = 'C:\Users\markd\Dropbox\ClaudeSync\messages.json'
-$conflictDir = 'C:\Users\markd\Dropbox\ClaudeSync'
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "config.ps1")
+
+$mainFile = $Global:MessagesFile
+$conflictDir = $Global:GoogleDriveSyncDir
 
 # Load main file
 $main = Get-Content $mainFile -Raw | ConvertFrom-Json

@@ -1,4 +1,7 @@
-$data = Get-Content 'C:\Users\markd\Dropbox\ClaudeSync\messages.json' -Raw | ConvertFrom-Json
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "config.ps1")
+
+$data = Get-Content $Global:MessagesFile -Raw | ConvertFrom-Json
 $myName = (hostname.exe).Trim()
 $recent = $data.messages | Sort-Object timestamp -Descending | Select-Object -First 5
 

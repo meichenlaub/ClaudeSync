@@ -1,9 +1,12 @@
 # Search for startup-related messages
-$data = Get-Content 'C:\Users\markd\Dropbox\ClaudeSync\messages.json' -Raw | ConvertFrom-Json
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "config.ps1")
+
+$data = Get-Content $Global:MessagesFile -Raw | ConvertFrom-Json
 $myName = (hostname.exe).Trim()
 
-# Look for messages about startup, shortcut, watcher, dropbox path
-$keywords = @('startup', 'shortcut', 'watcher', 'Dropbox.*watcher', 'start menu', 'autostart')
+# Look for messages about startup, shortcut, watcher, path
+$keywords = @('startup', 'shortcut', 'watcher', 'Google.*Drive', 'start menu', 'autostart')
 
 Write-Host "Searching for startup-related messages to $myName..." -ForegroundColor Cyan
 
