@@ -1,27 +1,34 @@
 # ClaudeSync Configuration
 # This file defines paths used by all ClaudeSync scripts
 
-# Google Drive path for messages.json (auto-detected)
-$GoogleDrivePaths = @(
+# Sync folder paths (auto-detected) - Google Drive preferred, Dropbox as fallback
+$SyncPaths = @(
     "$env:USERPROFILE\My Drive\ClaudeSync",
-    "$env:USERPROFILE\Google Drive\ClaudeSync"
+    "$env:USERPROFILE\Google Drive\ClaudeSync",
+    "G:\My Drive\ClaudeSync",
+    "$env:USERPROFILE\Dropbox (Personal)\ClaudeSync",
+    "$env:USERPROFILE\Dropbox\ClaudeSync",
+    "$env:USERPROFILE\Dropbox\claudesync"
 )
 
-$Global:GoogleDriveSyncDir = $null
-foreach ($path in $GoogleDrivePaths) {
+$Global:SyncDir = $null
+foreach ($path in $SyncPaths) {
     if (Test-Path $path) {
-        $Global:GoogleDriveSyncDir = $path
+        $Global:SyncDir = $path
         break
     }
 }
 
-if (-not $Global:GoogleDriveSyncDir) {
-    Write-Error "Could not find ClaudeSync folder in Google Drive. Checked: $($GoogleDrivePaths -join ', ')"
+if (-not $Global:SyncDir) {
+    Write-Error "Could not find ClaudeSync folder. Checked: $($SyncPaths -join ', ')"
     exit 1
 }
 
-# Messages file lives in Google Drive for real-time sync
-$Global:MessagesFile = Join-Path $Global:GoogleDriveSyncDir "messages.json"
+# Keep old variable name for compatibility
+$Global:DropboxSyncDir = $Global:SyncDir
+
+# Messages file lives in Dropbox for real-time sync
+$Global:MessagesFile = Join-Path $Global:DropboxSyncDir "messages.json"
 
 # Scripts live in GitHub repo
 $Global:ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
